@@ -14,15 +14,16 @@ import { notesCollection, db } from "./firebase"
 export default function App() {
     const [notes, setNotes] = React.useState([])
     const [currentNoteId, setCurrentNoteId] = React.useState("")
-    const sortedNotes = notes.sort((a, b) => b.updatedAt - a.updatedAt) 
+    const [tempNoteText, setTempNoteText] = React.useState("")
     
     const currentNote =
         notes.find(note => note.id === currentNoteId)
         || notes[0]
+    
+    const sortedNotes = notes.sort((a, b) => b.updatedAt - a.updatedAt)
 
     React.useEffect(() => {
         const unsubscribe = onSnapshot(notesCollection, function (snapshot) {
-            // Sync up local notes array with the snapshot data
             const notesArr = snapshot.docs.map(doc => ({
                 ...doc.data(),
                 id: doc.id
@@ -37,12 +38,27 @@ export default function App() {
             setCurrentNoteId(notes[0]?.id)
         }
     }, [notes])
+    
+    React.useEffect(() => {
+        if (currentNote) {
+            setTempNoteText(currentNote.body)
+        }
+    }, [currentNote])
+    
+    React.useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            if (tempNoteText !== currentNote.body) {
+                updateNote(tempNoteText)
+            }
+        }, 500)
+        return () => clearTimeout(timeoutId)
+    }, [tempNoteText])
 
     async function createNewNote() {
         const newNote = {
             body: "# Type your markdown note's title here",
             createdAt: Date.now(),
-            updatedAt: Date.now(),
+            updatedAt: Date.now()
         }
         const newNoteRef = await addDoc(notesCollection, newNote)
         setCurrentNoteId(newNoteRef.id)
@@ -50,10 +66,11 @@ export default function App() {
 
     async function updateNote(text) {
         const docRef = doc(db, "notes", currentNoteId)
-        await setDoc(docRef, { 
-            body: text,
-            updatedAt: Date.now(),
-        }, { merge: true })
+        await setDoc(
+            docRef, 
+            { body: text, updatedAt: Date.now() }, 
+            { merge: true }
+        )
     }
 
     async function deleteNote(noteId) {
@@ -79,8 +96,8 @@ export default function App() {
                             deleteNote={deleteNote}
                         />
                         <Editor
-                            currentNote={currentNote}
-                            updateNote={updateNote}
+                            tempNoteText={tempNoteText}
+                            setTempNoteText={setTempNoteText}
                         />
                     </Split>
                     :
